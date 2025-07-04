@@ -10,12 +10,12 @@ model_det = YOLO("./runs/detect/train/weights/best.pt")  # custom model to detec
 model_pose = YOLO("yolo11n-pose.pt")  # YOLO11n pose model
 
 # Open video
-video_path = "./test_images/wrist_curl_test_2.mp4"
+video_path = "./test_images/wrist_curl_test.mp4"
 cap = cv2.VideoCapture(video_path)
 fps = cap.get(cv2.CAP_PROP_FPS)
 width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
 height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-out = cv2.VideoWriter("output_tracking_2.mp4", cv2.VideoWriter_fourcc(*"mp4v"), fps, (width, height))
+out = cv2.VideoWriter("output_tracking.mp4", cv2.VideoWriter_fourcc(*"mp4v"), fps, (width, height))
 
 # Constants
 MOTION_THRESHOLD = 10 # ko thỏa mãn cái này thì chỉ bị tắt draw bounding box đi thôi
@@ -47,6 +47,7 @@ while cap.isOpened():
         print('Run object tracking. Frame: ', frame_index)
         result = model_det.track(frame, persist=True, verbose=False, stream=False)[0]
 
+    # Run through each frame with prev result
     if result and result.boxes and result.boxes.is_track:
         boxes = result.boxes.xywh.cpu()
         track_ids = result.boxes.id.int().cpu().tolist()

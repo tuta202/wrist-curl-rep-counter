@@ -7,21 +7,22 @@ import numpy as np
 from ultralytics import YOLO
 
 MOTION_THRESHOLD = 5
-REP_UP_THRESHOLD = -10
-REP_DOWN_THRESHOLD = 10 
+REP_UP_THRESHOLD = -5
+REP_DOWN_THRESHOLD = 5
 
 # Load models
 model_det = YOLO("./runs/detect/train/weights/best.pt")  # custom model to detect weight
 model_pose = YOLO("yolo11n-pose.pt")  # YOLOv8 pose model (you can use s/m/l)
 
 # Open video
-video_path = "./test_images/wrist_curl_test.mp4"
+video_path = "./test_images/wrist_curl_test_2.mp4"
 cap = cv2.VideoCapture(video_path)
 
 fps = cap.get(cv2.CAP_PROP_FPS)
+print("FPS:", fps, "COOLDOWN:", int(fps / 2))
 width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
 height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-out = cv2.VideoWriter("output_tracking.mp4", cv2.VideoWriter_fourcc(*"mp4v"), fps, (width, height))
+out = cv2.VideoWriter("output_tracking_2.mp4", cv2.VideoWriter_fourcc(*"mp4v"), fps, (width, height))
 
 track_history = defaultdict(lambda: [])
 
@@ -45,7 +46,7 @@ while cap.isOpened():
         cv2.circle(frame, (int(nose[0]), int(nose[1])), 5, (255, 255, 0), -1)
 
     # Run object tracking (YOLO)
-    result = model_det.track(frame, persist=True, verbose=True, stream=False)[0]
+    result = model_det.track(frame, persist=True, verbose=False, stream=False)[0]
 
     if result.boxes and result.boxes.is_track:
         boxes = result.boxes.xywh.cpu()
@@ -58,29 +59,41 @@ while cap.isOpened():
             center = (float(x), float(y))
             track.append(center)
             
-            # Track y-position and count reps
+            # Initialize rep tracking
             if "rep_state" not in track_history:
                 track_history["rep_state"] = {}
 
             if track_id not in track_history["rep_state"]:
                 track_history["rep_state"][track_id] = {
-                    "direction": None,
                     "count": 0,
-                    "last_y": y
+                    "state": "idle",     # can be: idle → up → down : 1rep → up → down : 2reps → up → down : 3reps
+                    "last_y": y,
+                    "cooldown": 0
                 }
 
             rep_info = track_history["rep_state"][track_id]
             delta_y = y - rep_info["last_y"]
-
-            # Detect phase changes
-            if rep_info["direction"] != "up" and delta_y < REP_UP_THRESHOLD:
-                rep_info["direction"] = "up"
-
-            elif rep_info["direction"] == "up" and delta_y > REP_DOWN_THRESHOLD:
-                rep_info["direction"] = "down"
-                rep_info["count"] += 1  # One full rep completed
-
             rep_info["last_y"] = y
+
+            # Apply cooldown to avoid rapid duplicate counts
+            if rep_info["cooldown"] > 0:
+                rep_info["cooldown"] -= 1
+
+            # State machine for rep detection
+            if rep_info["state"] == "idle":
+                if delta_y < REP_UP_THRESHOLD:  # moving upward
+                    rep_info["state"] = "up"
+
+            elif rep_info["state"] == "down":
+                if delta_y < REP_UP_THRESHOLD:  # upward
+                    rep_info["state"] = "up"
+
+            elif rep_info["state"] == "up":
+                if delta_y > REP_DOWN_THRESHOLD:  # down again = full rep
+                    if rep_info["cooldown"] == 0:
+                        rep_info["count"] += 1
+                        rep_info["cooldown"] = int(fps / 2)  # skip next few frames, 30 FPS → 10 frame = ~0.33 s
+                    rep_info["state"] = "down"
             
             if len(track) > 30:
                 track.pop(0)

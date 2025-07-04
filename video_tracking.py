@@ -19,9 +19,10 @@ out = cv2.VideoWriter("output_tracking.mp4", cv2.VideoWriter_fourcc(*"mp4v"), fp
 
 # Constants
 MOTION_THRESHOLD = 10
-REP_UP_THRESHOLD = -5
-REP_DOWN_THRESHOLD = 5
+REP_UP_THRESHOLD = -8
+REP_DOWN_THRESHOLD = 8
 MAX_TRACK_LENGTH = 20
+TRACK_EVERY_N_FRAMES = 2 
 
 frame_index = 0
 nose_position = None
@@ -42,10 +43,11 @@ while cap.isOpened():
     if nose_position:
         cv2.circle(frame, nose_position, 5, (255, 255, 0), -1)
         
-    # Run object tracking
-    result = model_det.track(frame, persist=True, verbose=False, stream=False)[0]
+    if frame_index % TRACK_EVERY_N_FRAMES == 0:
+        print('Run object tracking. Frame: ', frame_index)
+        result = model_det.track(frame, persist=True, verbose=False, stream=False)[0]
 
-    if result.boxes and result.boxes.is_track:
+    if result and result.boxes and result.boxes.is_track:
         boxes = result.boxes.xywh.cpu()
         track_ids = result.boxes.id.int().cpu().tolist()
         # frame = result.plot()

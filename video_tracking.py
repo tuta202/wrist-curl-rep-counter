@@ -24,21 +24,21 @@ model_det = YOLO("./runs/detect/train/weights/best.pt")  # custom model to detec
 model_pose = YOLO("yolo11n-pose.pt")  # YOLO11n pose model
 
 # Open video
-# video_path = "./test_images/wrist_curl_test.mp4"
-# cap = cv2.VideoCapture(video_path)
+video_path = "./test_images/wrist_curl_test.mp4"
+cap = cv2.VideoCapture(video_path)
 # Open webcam
-cap = cv2.VideoCapture(0)
+# cap = cv2.VideoCapture(0)
 fps = cap.get(cv2.CAP_PROP_FPS)
 width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
 height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
 out = cv2.VideoWriter("output_tracking.mp4", cv2.VideoWriter_fourcc(*"mp4v"), fps, (width, height))
 
 # Constants
+TRACK_EVERY_N_FRAMES = 3 
 MOTION_THRESHOLD = 10 # ko thỏa mãn cái này thì chỉ bị tắt draw bounding box đi thôi
 REP_UP_THRESHOLD = -8
 REP_DOWN_THRESHOLD = 8
 MAX_TRACK_LENGTH = 20
-TRACK_EVERY_N_FRAMES = 2 
 
 frame_index = 0
 nose_position = None
@@ -147,7 +147,7 @@ while cap.isOpened():
     if cv2.waitKey(1) & 0xFF == ord("q"):
         break
 
-    # out.write(frame)
+    out.write(frame)
     frame_index += 1
 
 cap.release()

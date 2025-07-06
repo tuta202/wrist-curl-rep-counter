@@ -1,5 +1,6 @@
 import os
 os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
+import lap
 from collections import defaultdict
 import cv2
 import numpy as np
@@ -10,8 +11,10 @@ model_det = YOLO("./runs/detect/train/weights/best.pt")  # custom model to detec
 model_pose = YOLO("yolo11n-pose.pt")  # YOLO11n pose model
 
 # Open video
-video_path = "./test_images/wrist_curl_test.mp4"
-cap = cv2.VideoCapture(video_path)
+# video_path = "./test_images/wrist_curl_test.mp4"
+# cap = cv2.VideoCapture(video_path)
+# Open webcam
+cap = cv2.VideoCapture(0)
 fps = cap.get(cv2.CAP_PROP_FPS)
 width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
 height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
@@ -120,7 +123,7 @@ while cap.isOpened():
             cv2.polylines(frame, [points], isClosed=False, color=(0, 255, 0), thickness=6)
 
     # Show frame
-    cv2.imshow("YOLO + Pose Tracking", frame)
+    cv2.imshow("YOLO Reps Counter", frame)
     if cv2.waitKey(1) & 0xFF == ord("q"):
         break
 

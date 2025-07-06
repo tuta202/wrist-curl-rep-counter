@@ -5,6 +5,19 @@ from collections import defaultdict
 import cv2
 import numpy as np
 from ultralytics import YOLO
+from gtts import gTTS
+import tempfile
+import playsound
+import threading
+
+def speak_text(text):
+    tts = gTTS(text=text, lang='en')
+    with tempfile.NamedTemporaryFile(delete=True, suffix=".mp3") as fp:
+        tts.save(fp.name)
+        playsound.playsound(fp.name)
+
+def speak_text_async(text):
+    threading.Thread(target=speak_text, args=(text,), daemon=True).start()
 
 # Load models
 model_det = YOLO("./runs/detect/train/weights/best.pt")  # custom model to detect weight
@@ -31,12 +44,13 @@ frame_index = 0
 nose_position = None
 track_history = defaultdict(lambda: [])
 # Loop video
+print('fps: ', fps)
 while cap.isOpened():
     success, frame = cap.read()
     if not success:
         break
 
-    if frame_index % int(fps / 2) == 0:  # skip running pose estimation. ~0.5 s
+    if frame_index % int(fps * 2 / 3) == 0:  # skip running pose estimation.
         print('Run pose estimation. Frame: ', frame_index)
         pose_results = model_pose.predict(frame, verbose=False, stream=False)[0]
         if len(pose_results.keypoints) > 0:
@@ -47,7 +61,7 @@ while cap.isOpened():
         cv2.circle(frame, nose_position, 5, (255, 255, 0), -1)
         
     if frame_index % TRACK_EVERY_N_FRAMES == 0:
-        print('Run object tracking. Frame: ', frame_index)
+        # print('Run object tracking. Frame: ', frame_index)
         result = model_det.track(frame, persist=True, verbose=False, stream=False)[0]
 
     # Run through each frame with prev result
@@ -71,7 +85,8 @@ while cap.isOpened():
                     "count": 0,
                     "state": "idle",    # can be: idle → up → down : 1rep → up → down : 2reps → up → down : 3reps
                     "last_y": y,
-                    "cooldown": 0
+                    "cooldown": 0,
+                    "last_spoken_count": 0 
                 }
 
             rep_info = track_history["rep_state"][track_id]
@@ -117,17 +132,22 @@ while cap.isOpened():
             bx1, by1 = int(x - w / 2), int(y - h / 2)
             bx2, by2 = int(x + w / 2), int(y + h / 2)
             cv2.rectangle(frame, (bx1, by1), (bx2, by2), (0, 255, 0), 2)
-            text = f"ID:{track_id} | Rep:{rep_info['count']}"
+            text = f"ID: {track_id} | Rep: {rep_info['count']}"
             cv2.putText(frame, text, (bx1, by1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 255), 2)
             points = np.hstack(track).astype(np.int32).reshape((-1, 1, 2))
             cv2.polylines(frame, [points], isClosed=False, color=(0, 255, 0), thickness=6)
+
+            # 4. Play sound
+            if rep_info["count"] > rep_info["last_spoken_count"]:
+                speak_text_async(str(rep_info["count"]))
+                rep_info["last_spoken_count"] = rep_info["count"]
 
     # Show frame
     cv2.imshow("YOLO Reps Counter", frame)
     if cv2.waitKey(1) & 0xFF == ord("q"):
         break
 
-    out.write(frame)
+    # out.write(frame)
     frame_index += 1
 
 cap.release()
